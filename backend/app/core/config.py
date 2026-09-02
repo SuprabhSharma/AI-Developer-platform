@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_DEFAULT_PER_MINUTE: int = 100
 
     # --- CORS ---
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = ["https://ai-developer-platform-ivory.vercel.app/"]
 
     # --- File operation safety limits ---
     MAX_FILE_READ_BYTES: int = 1_000_000  # 1MB cap on a single file read
