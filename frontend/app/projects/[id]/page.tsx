@@ -267,8 +267,13 @@ export default function WorkspacePage() {
         activePathRef.current = newPath;
         setActivePath(newPath);
         if (localContent !== undefined && revision !== undefined) scheduleSave(newPath, localContent, revision);
+      } else if (activePathRef.current && activePathRef.current.startsWith(`${path}/`)) {
+        const suffix = activePathRef.current.slice(path.length);
+        const nextActive = `${newPath}${suffix}`;
+        activePathRef.current = nextActive;
+        setActivePath(nextActive);
       }
-      toast({ tone: "success", message: `${path} renamed.` });
+      toast({ tone: "success", message: `${path} moved/renamed.` });
     } catch (err) {
       toast({ tone: "error", message: err instanceof Error ? err.message : "Rename failed." });
       throw err;
@@ -285,7 +290,13 @@ export default function WorkspacePage() {
       saveTimersRef.current.delete(path);
       latestContentRef.current.delete(path);
       revisionsRef.current.delete(path);
-      if (activePath === path) { activePathRef.current = null; setActivePath(null); contentRef.current = ""; setContent(""); setSaveStatus("saved"); }
+      if (activePath === path || (activePath && activePath.startsWith(`${path}/`))) {
+        activePathRef.current = null;
+        setActivePath(null);
+        contentRef.current = "";
+        setContent("");
+        setSaveStatus("saved");
+      }
       toast({ tone: "success", message: `${path} deleted.` });
     } catch (err) {
       toast({ tone: "error", message: err instanceof Error ? err.message : "Delete failed." });
@@ -345,7 +356,7 @@ export default function WorkspacePage() {
       <CommandPalette files={files} onOpenFile={openFile} onNewFile={() => setCreateRequest("file")} onNewProject={() => router.push("/projects?new=1")} onToggleChat={() => setChatVisible((visible) => !visible)} />
       <div className="workspace-toolbar"><div className="workspace-breadcrumb"><span className="breadcrumb-project">{project?.name || "Loading project"}</span><Icon name="chevron-right" size={13} /><span>{activePath || "No file selected"}</span></div><div className="workspace-tools"><span className="command-hint"><Icon name="command" size={13} /> <kbd>⌘ / Ctrl K</kbd> Commands</span>{activePath && <span className={`save-status save-status-${saveStatus}`} role="status"><Icon name={saveStatus === "saved" ? "check" : saveStatus === "saving" ? "refresh" : "x"} size={14} /> {saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Unsaved changes"}</span>}</div></div>
       <div className="workspace-body" style={{ gridTemplateColumns: gridTemplate }}>
-        <aside className="workspace-panel workspace-explorer"><FileExplorer files={files} loading={filesLoading} error={filesError} onRetry={loadFiles} onSelect={openFile} activePath={activePath} onCreateFile={createFile} onCreateFolder={createFolder} onRenameFile={renameFile} onDeleteFile={deleteFile} onExplainFile={(path) => void requestFileAction(path, "explain_code")} onGenerateTests={(path) => void requestFileAction(path, "generate_tests")} onUpload={uploadFiles} createRequest={createRequest} onCreateRequestHandled={() => setCreateRequest(null)} /><div className="panel-resizer panel-resizer-right" onPointerDown={(event) => setDragging({ side: "explorer", startX: event.clientX, startWidth: widths.explorer })} role="separator" aria-label="Resize file explorer" /></aside>
+        <aside className="workspace-panel workspace-explorer"><FileExplorer projectName={project?.name} rootName="main" files={files} loading={filesLoading} error={filesError} onRetry={loadFiles} onSelect={openFile} activePath={activePath} onCreateFile={createFile} onCreateFolder={createFolder} onRenameFile={renameFile} onDeleteFile={deleteFile} onExplainFile={(path) => void requestFileAction(path, "explain_code")} onGenerateTests={(path) => void requestFileAction(path, "generate_tests")} createRequest={createRequest} onCreateRequestHandled={() => setCreateRequest(null)} /><div className="panel-resizer panel-resizer-right" onPointerDown={(event) => setDragging({ side: "explorer", startX: event.clientX, startWidth: widths.explorer })} role="separator" aria-label="Resize file explorer" /></aside>
         <section className="workspace-panel workspace-editor"><CodeEditor path={activePath} content={content} onChange={handleEditorChange} loading={reading} /></section>
         {chatVisible && <aside className="workspace-panel workspace-chat"><div className="panel-resizer panel-resizer-left" onPointerDown={(event) => setDragging({ side: "chat", startX: event.clientX, startWidth: widths.chat })} role="separator" aria-label="Resize chat panel" /><div className="agent-tabs" role="tablist"><button className={panelTab === "chat" ? "agent-tab agent-tab-active" : "agent-tab"} type="button" role="tab" aria-selected={panelTab === "chat"} onClick={() => setPanelTab("chat")}>Chat</button><button className={panelTab === "agent" ? "agent-tab agent-tab-active" : "agent-tab"} type="button" role="tab" aria-selected={panelTab === "agent"} onClick={() => setPanelTab("agent")}>Agent</button></div>{panelTab === "chat" ? <ChatPanel projectId={projectId} pendingAction={chatAction} onPendingActionHandled={() => setChatAction(null)} /> : <AgentPanel projectId={projectId} activePath={activePath} content={content} files={files} onApplyCode={handleApplyCode} onInsertCode={handleInsertCode} onCreateFile={handleCreateAndApply} />}</aside>}
       </div>

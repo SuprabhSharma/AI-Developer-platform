@@ -16,11 +16,11 @@ from app.repositories.project_repository import ProjectRepository
 from app.schemas.file import (
     FileContentResponse,
     FileNode,
-    FileRenameRequest,
     FileTreeResponse,
     FileUploadResponse,
     FileWriteRequest,
     FolderCreateRequest,
+    RenameRequest,
 )
 from app.services.file_service import FileService
 from app.services.project_service import ProjectService
@@ -47,6 +47,7 @@ async def list_files(
     )
 
 
+@router.post("/folders", response_model=FileNode, status_code=status.HTTP_201_CREATED)
 @router.post("/folder", response_model=FileNode, status_code=status.HTTP_201_CREATED)
 async def create_folder(
     project_id: uuid.UUID,
@@ -117,13 +118,13 @@ async def write_file(
 async def rename_file(
     project_id: uuid.UUID,
     file_path: str,
-    payload: FileRenameRequest,
+    payload: RenameRequest,
     org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
 ):
     workspace_id = await _workspace_id(project_id, org, db)
     service = FileService(FileRepository(db), get_storage_provider())
-    record = await service.rename_file(workspace_id, file_path, payload.new_path)
+    record = await service.rename_path(workspace_id, file_path, payload.new_path)
     await db.commit()
     return FileNode(path=record.path, file_type=record.file_type.value, size_bytes=record.size_bytes)
 
@@ -137,6 +138,6 @@ async def delete_file(
 ):
     workspace_id = await _workspace_id(project_id, org, db)
     service = FileService(FileRepository(db), get_storage_provider())
-    await service.delete_file(workspace_id, file_path)
+    await service.delete_path(workspace_id, file_path)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

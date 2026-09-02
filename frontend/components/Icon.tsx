@@ -15,6 +15,7 @@ export type IconName =
   | "dollar"
   | "file"
   | "folder"
+  | "folder-open"
   | "folder-plus"
   | "github"
   | "logout"
@@ -41,6 +42,7 @@ const paths: Record<IconName, JSX.Element> = {
   copy: <><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
   file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6" /><path d="M8 13h8M8 17h6" /></>,
   folder: <><path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></>,
+  "folder-open": <><path d="M5 19h14a2 2 0 0 0 1.94-1.5l1.6-6A2 2 0 0 0 20.6 9H4.4a2 2 0 0 0-1.94 2.5l1.6 6A2 2 0 0 0 5 19Z" /><path d="M3 9V6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1" /></>,
   "folder-plus": <><path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /><path d="M12 10v6M9 13h6" /></>,
   github: <><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3.3-.4 6.8-1.6 6.8-7A5.4 5.4 0 0 0 19.4 4 5 5 0 0 0 19.3.4S18.1 0 15 2.1a13.4 13.4 0 0 0-6 0C5.9 0 4.7.4 4.7.4A5 5 0 0 0 4.6 4a5.4 5.4 0 0 0-1.4 3.7c0 5.4 3.5 6.6 6.8 7A4.8 4.8 0 0 0 9 18v4" /><path d="M9 18c-4.5 2-5-2-7-2" /></>,
   logout: <><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /><path d="M21 19V5a2 2 0 0 0-2-2h-6" /></>,

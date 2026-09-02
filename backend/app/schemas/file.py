@@ -30,5 +30,8 @@ class FolderCreateRequest(BaseModel):
     path: str = Field(min_length=1, max_length=2048)
 
 
-class FileRenameRequest(BaseModel):
+class RenameRequest(BaseModel):
     new_path: str = Field(min_length=1, max_length=2048)
+
+
+FileRenameRequest = RenameRequest
