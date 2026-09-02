@@ -1,36 +1,33 @@
 "use client";
+
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { register } from "@/services/authService";
+import Icon from "@/components/Icon";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
+    setLoading(true);
     try {
       await register(email, password);
       router.push("/projects");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-graphite-800 border border-graphite-600 rounded-lg p-6 flex flex-col gap-4">
-        <h1 className="text-lg font-semibold text-signal">Create account</h1>
-        <input className="bg-graphite-700 border border-graphite-600 rounded-md px-3 py-2 text-sm" placeholder="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input className="bg-graphite-700 border border-graphite-600 rounded-md px-3 py-2 text-sm" placeholder="Password (min 8 chars)" type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
-        {error && <p className="text-red-400 text-xs">{error}</p>}
-        <button className="bg-signal text-graphite-900 rounded-md py-2 text-sm font-medium hover:bg-signal-dim transition-colors" type="submit">
-          Create account
-        </button>
-      </form>
-    </main>
+    <main className="auth-shell"><section className="auth-card"><Link href="/" className="auth-brand"><span className="brand-mark"><Icon name="github" size={17} /></span> Forge</Link><h1>Create your workspace</h1><p>Keep your projects, files, and notes together.</p><form onSubmit={handleSubmit} className="auth-form"><label>Email<input className="field" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label><label>Password<input className="field" type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" required /><span className="field-note">Use at least 8 characters.</span></label>{error && <p className="auth-error" role="alert">{error}</p>}<button className="primary-button" type="submit" disabled={loading}>{loading && <span className="spinner spinner-small" />}{loading ? "Creating account" : "Create account"}</button></form><p className="auth-footer">Already have an account? <Link href="/login">Sign in</Link></p></section></main>
   );
 }

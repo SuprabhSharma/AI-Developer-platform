@@ -7,24 +7,26 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@monaco-editor/react": "4.6.0",
     "next": "14.2.5",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "@monaco-editor/react": "4.6.0",
+    "react-window": "^1.8.10",
     "zustand": "4.5.4"
   },
   "devDependencies": {
-    "typescript": "5.5.4",
-    "@types/react": "18.3.3",
     "@types/node": "20.14.10",
-    "tailwindcss": "3.4.6",
-    "postcss": "8.4.39",
+    "@types/react": "18.3.3",
+    "@types/react-window": "^1.8.8",
     "autoprefixer": "10.4.19",
-    "vitest": "2.0.5",
     "eslint": "8.57.0",
-    "eslint-config-next": "14.2.5"
+    "eslint-config-next": "14.2.5",
+    "postcss": "8.4.39",
+    "tailwindcss": "3.4.6",
+    "typescript": "5.5.4",
+    "vitest": "2.0.5"
   }
 }

@@ -6,6 +6,7 @@ Never hard-code secrets anywhere else in the codebase — import `settings` inst
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,14 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        """Accept the deployment-style ``release`` flag as debug disabled."""
+        if isinstance(value, str) and value.strip().lower() == "release":
+            return False
+        return value
 
     # --- Database ---
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_dev_platform"
@@ -56,6 +65,8 @@ class Settings(BaseSettings):
 
     # --- File operation safety limits ---
     MAX_FILE_READ_BYTES: int = 1_000_000  # 1MB cap on a single file read
+    MAX_FILE_UPLOAD_BYTES: int = 10_000_000  # 10MB cap per uploaded file
+    MAX_BATCH_UPLOAD_FILES: int = 1_000
 
 
 @lru_cache

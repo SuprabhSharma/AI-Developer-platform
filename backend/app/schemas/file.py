@@ -11,6 +11,11 @@ class FileTreeResponse(BaseModel):
     items: list[FileNode]
 
 
+class FileUploadResponse(BaseModel):
+    items: list[FileNode]
+    total: int
+
+
 class FileContentResponse(BaseModel):
     path: str
     content: str
@@ -19,3 +24,11 @@ class FileContentResponse(BaseModel):
 
 class FileWriteRequest(BaseModel):
     content: str = Field(max_length=2_000_000)
+
+
+class FolderCreateRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=2048)
+
+
+class FileRenameRequest(BaseModel):
+    new_path: str = Field(min_length=1, max_length=2048)

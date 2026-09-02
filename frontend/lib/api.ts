@@ -9,22 +9,40 @@ function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export function apiEndpoint(path: string): string {
+  return `${API_URL}/api/v1${path}`;
+}
+
+export function apiHeaders(options: HeadersInit = {}): Headers {
+  const headers = new Headers(options);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const token = getToken();
-  const res = await fetch(`${API_URL}/api/v1${path}`, {
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return headers;
+}
+
+export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const isMultipart = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const headers = new Headers(options.headers);
+  if (!isMultipart && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const authToken = getToken();
+  if (authToken) headers.set("Authorization", `Bearer ${authToken}`);
+  const res = await fetch(apiEndpoint(path), {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Request failed with status ${res.status}`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+export function projectFilePath(projectId: string, path: string) {
+  const encodedPath = path.split("/").map((part) => encodeURIComponent(part)).join("/");
+  return `/projects/${projectId}/files/${encodedPath}`;
 }
 
 export function setTokens(access: string, refresh: string) {

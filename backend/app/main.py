@@ -2,6 +2,7 @@
 import logging
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,16 +12,25 @@ from fastapi.responses import JSONResponse
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
+from app.core.redis import create_redis_client
 from app.utils.request_id import RequestIdMiddleware
 
 configure_logging(settings.DEBUG)
 logger = get_logger(__name__)
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    application.state.redis = create_redis_client()
+    yield
+    await application.state.redis.aclose()
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     version="0.1.0",
     docs_url="/docs",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
 
 app.add_middleware(RequestIdMiddleware)

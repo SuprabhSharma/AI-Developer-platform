@@ -4,11 +4,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        graphite: { 900: "#0b0d10", 800: "#12151a", 700: "#1b1f26", 600: "#262b34", 500: "#3a414d" },
-        signal: { DEFAULT: "#f5a524", dim: "#b9791b" },
+        graphite: { 950: "#080b0f", 900: "#0d1117", 800: "#161b22", 700: "#21262d", 600: "#30363d", 500: "#484f58", 400: "#6e7681" },
+        signal: { DEFAULT: "#58a6ff", dim: "#388bfd" },
+        github: { blue: "#58a6ff", green: "#3fb950", red: "#f85149", yellow: "#d29922" },
       },
       fontFamily: {
-        mono: ["JetBrains Mono", "Menlo", "monospace"],
+        sans: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "Noto Sans", "Helvetica", "Arial", "sans-serif"],
+        mono: ["JetBrains Mono", "SFMono-Regular", "Consolas", "Liberation Mono", "monospace"],
       },
     },
   },

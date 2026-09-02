@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.factory import get_ai_provider
 from app.core.deps import get_current_organization, get_current_user
+from app.core.redis import enforce_ai_rate_limit, get_redis
 from app.db.session import get_db
 from app.models.user import Organization, User
 from app.repositories.conversation_repository import ConversationRepository
@@ -27,8 +28,10 @@ async def chat(
     user: User = Depends(get_current_user),
     org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     await ProjectService(ProjectRepository(db)).get_project_or_404(project_id, org.id)
+    await enforce_ai_rate_limit(redis, user.id, project_id)
 
     service = AIService(get_ai_provider(), ConversationRepository(db), db)
     try:

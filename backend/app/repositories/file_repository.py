@@ -26,6 +26,7 @@ class FileRepository:
     async def upsert(self, record: FileRecord) -> FileRecord:
         existing = await self.get_by_path(record.workspace_id, record.path)
         if existing:
+            existing.file_type = record.file_type
             existing.storage_key = record.storage_key
             existing.size_bytes = record.size_bytes
             existing.content_hash = record.content_hash
@@ -34,3 +35,7 @@ class FileRepository:
         self.db.add(record)
         await self.db.flush()
         return record
+
+    async def delete(self, record: FileRecord) -> None:
+        await self.db.delete(record)
+        await self.db.flush()

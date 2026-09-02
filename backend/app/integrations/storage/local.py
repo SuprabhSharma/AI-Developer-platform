@@ -7,7 +7,7 @@ from app.integrations.storage.base import StorageProvider
 
 class LocalStorage(StorageProvider):
     def __init__(self, root: str | None = None):
-        self.root = Path(root or settings.LOCAL_STORAGE_ROOT)
+        self.root = Path(root or settings.LOCAL_STORAGE_ROOT).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _path(self, key: str) -> Path:
