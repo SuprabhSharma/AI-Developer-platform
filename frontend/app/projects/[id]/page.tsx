@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import FileExplorer, { type UploadEntry } from "@/components/FileExplorer";
 import CodeEditor from "@/components/CodeEditor";
 import ChatPanel, { type FileChatAction } from "@/components/ChatPanel";
+import AgentPanel from "@/components/AgentPanel";
 import TopNavigation from "@/components/TopNavigation";
 import CommandPalette from "@/components/CommandPalette";
 import Icon from "@/components/Icon";
@@ -35,6 +36,7 @@ export default function WorkspacePage() {
   const [reading, setReading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [chatVisible, setChatVisible] = useState(true);
+  const [panelTab, setPanelTab] = useState<"chat" | "agent">("chat");
   const [createRequest, setCreateRequest] = useState<"file" | "folder" | null>(null);
   const [chatAction, setChatAction] = useState<FileChatAction | null>(null);
   const [widths, setWidths] = useState<PanelWidths>(DEFAULT_WIDTHS);
@@ -302,6 +304,39 @@ export default function WorkspacePage() {
     toast({ tone: "success", message: `${entries.length} file${entries.length === 1 ? "" : "s"} uploaded.` });
   }, [loadFiles, projectId, toast]);
 
+  const handleApplyCode = useCallback((newCode: string, targetPath?: string) => {
+    const fileToUpdate = targetPath || activePathRef.current;
+    if (!fileToUpdate) {
+      toast({ tone: "error", message: "Select a file to apply code." });
+      return;
+    }
+    handleEditorChange(newCode);
+    toast({ tone: "success", message: `Applied AI code to ${fileToUpdate}` });
+  }, [handleEditorChange, toast]);
+
+  const handleInsertCode = useCallback((codeSnippet: string) => {
+    if (!activePathRef.current) {
+      toast({ tone: "error", message: "Select a file to insert code." });
+      return;
+    }
+    const current = contentRef.current;
+    const separator = current.endsWith("\n") || !current ? "" : "\n";
+    const updated = `${current}${separator}${codeSnippet}\n`;
+    handleEditorChange(updated);
+    toast({ tone: "success", message: `Inserted code into ${activePathRef.current}` });
+  }, [handleEditorChange, toast]);
+
+  const handleCreateAndApply = useCallback(async (path: string, newCode: string) => {
+    try {
+      await apiFetch(projectFilePath(projectId, path), { method: "PUT", body: JSON.stringify({ content: newCode }) });
+      await loadFiles();
+      await openFile(path);
+      toast({ tone: "success", message: `Created and opened ${path}` });
+    } catch (err) {
+      toast({ tone: "error", message: err instanceof Error ? err.message : "Failed to create file" });
+    }
+  }, [loadFiles, openFile, projectId, toast]);
+
   const gridTemplate = chatVisible ? `${widths.explorer}px minmax(0, 1fr) ${widths.chat}px` : `${widths.explorer}px minmax(0, 1fr)`;
 
   return (
@@ -312,7 +347,7 @@ export default function WorkspacePage() {
       <div className="workspace-body" style={{ gridTemplateColumns: gridTemplate }}>
         <aside className="workspace-panel workspace-explorer"><FileExplorer files={files} loading={filesLoading} error={filesError} onRetry={loadFiles} onSelect={openFile} activePath={activePath} onCreateFile={createFile} onCreateFolder={createFolder} onRenameFile={renameFile} onDeleteFile={deleteFile} onExplainFile={(path) => void requestFileAction(path, "explain_code")} onGenerateTests={(path) => void requestFileAction(path, "generate_tests")} onUpload={uploadFiles} createRequest={createRequest} onCreateRequestHandled={() => setCreateRequest(null)} /><div className="panel-resizer panel-resizer-right" onPointerDown={(event) => setDragging({ side: "explorer", startX: event.clientX, startWidth: widths.explorer })} role="separator" aria-label="Resize file explorer" /></aside>
         <section className="workspace-panel workspace-editor"><CodeEditor path={activePath} content={content} onChange={handleEditorChange} loading={reading} /></section>
-        {chatVisible && <aside className="workspace-panel workspace-chat"><div className="panel-resizer panel-resizer-left" onPointerDown={(event) => setDragging({ side: "chat", startX: event.clientX, startWidth: widths.chat })} role="separator" aria-label="Resize chat panel" /><ChatPanel projectId={projectId} pendingAction={chatAction} onPendingActionHandled={() => setChatAction(null)} /></aside>}
+        {chatVisible && <aside className="workspace-panel workspace-chat"><div className="panel-resizer panel-resizer-left" onPointerDown={(event) => setDragging({ side: "chat", startX: event.clientX, startWidth: widths.chat })} role="separator" aria-label="Resize chat panel" /><div className="agent-tabs" role="tablist"><button className={panelTab === "chat" ? "agent-tab agent-tab-active" : "agent-tab"} type="button" role="tab" aria-selected={panelTab === "chat"} onClick={() => setPanelTab("chat")}>Chat</button><button className={panelTab === "agent" ? "agent-tab agent-tab-active" : "agent-tab"} type="button" role="tab" aria-selected={panelTab === "agent"} onClick={() => setPanelTab("agent")}>Agent</button></div>{panelTab === "chat" ? <ChatPanel projectId={projectId} pendingAction={chatAction} onPendingActionHandled={() => setChatAction(null)} /> : <AgentPanel projectId={projectId} activePath={activePath} content={content} files={files} onApplyCode={handleApplyCode} onInsertCode={handleInsertCode} onCreateFile={handleCreateAndApply} />}</aside>}
       </div>
     </div>
   );

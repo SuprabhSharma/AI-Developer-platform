@@ -4,6 +4,7 @@ Alembic autogeneration (`alembic revision --autogenerate`) and for
 `Base.metadata.create_all` used by the test suite's SQLite fixtures.
 """
 from app.models.conversation import Conversation, Message, MessageRole  # noqa: F401
+from app.models.agent import AgentRun, Plan, PlanStatus, PlanStep, PlanStepStatus  # noqa: F401
 from app.models.file import FileRecord, FileType  # noqa: F401
 from app.models.git_integration import GitIntegration  # noqa: F401
 from app.models.job import Job, JobStatus, JobType  # noqa: F401

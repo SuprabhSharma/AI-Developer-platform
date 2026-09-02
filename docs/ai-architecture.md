@@ -1,12 +1,12 @@
 # AI Architecture
 
 ```
-Route → AIService → AIProvider interface → concrete provider (Mock/Gemini/Groq/Ollama) → LLM API
+Route → AIService → AIProvider interface → concrete provider (Mock/Gemini/Groq/OpenRouter/Ollama) → LLM API
 ```
 
 `AIProvider` (app/ai/provider.py) declares `chat()`, `stream_chat()`, and capability
 methods (`generate_code`, `explain_code`, `analyze_code`, `generate_tests`). Mock,
-Gemini, and Groq implement the three Phase 3 capabilities. `app/ai/factory.py` selects
+Gemini, Groq, and OpenRouter implement the three Phase 3 capabilities. `app/ai/factory.py` selects
 the concrete provider from `AI_PROVIDER`; if a key is missing for a paid provider it
 falls back to `MockProvider` rather than crashing the app.
 

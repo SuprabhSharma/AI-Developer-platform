@@ -11,7 +11,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "backend/.env", "../.env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # --- App ---
     APP_NAME: str = "AI Developer Platform"
@@ -27,6 +31,13 @@ class Settings(BaseSettings):
             return False
         return value
 
+    @field_validator("AI_API_KEY", "AI_MODEL", "AI_PROVIDER", "GROQ_ENDPOINT", mode="before")
+    @classmethod
+    def clean_str_settings(cls, value):
+        if isinstance(value, str):
+            return value.strip().strip("'\"")
+        return value
+
     # --- Database ---
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_dev_platform"
 
@@ -40,20 +51,15 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
     # --- AI Provider ---
-    # Swapping providers only requires changing this env var; see app/ai/factory.py
-    AI_PROVIDER: Literal["mock", "gemini", "groq", "openrouter", "ollama"] = "mock"
+    AI_PROVIDER: str = "groq"
     AI_API_KEY: str = ""
-    AI_MODEL: str = "default"
-
-    # --- GitHub Integration ---
-    GITHUB_CLIENT_ID: str = ""
-    GITHUB_CLIENT_SECRET: str = ""
+    AI_MODEL: str = "openai/gpt-oss-120b"
+    AI_AGENT_MAX_TOKENS: int = 4096
+    GROQ_ENDPOINT: str = "https://api.groq.com/openai/v1/chat/completions"
 
     # --- Storage ---
-    STORAGE_PROVIDER: Literal["local", "s3"] = "local"
+    STORAGE_PROVIDER: str = "local"
     LOCAL_STORAGE_ROOT: str = "./storage_data"
-    S3_BUCKET: str = ""
-    S3_REGION: str = ""
 
     # --- Rate limiting (requests per minute, enforced via Redis) ---
     RATE_LIMIT_AUTH_PER_MINUTE: int = 10
@@ -61,7 +67,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_DEFAULT_PER_MINUTE: int = 100
 
     # --- CORS ---
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # --- File operation safety limits ---
     MAX_FILE_READ_BYTES: int = 1_000_000  # 1MB cap on a single file read

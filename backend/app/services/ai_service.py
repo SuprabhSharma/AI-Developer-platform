@@ -105,6 +105,13 @@ class AIService:
     ) -> tuple[uuid.UUID, AsyncIterator[str]]:
         """Prepare a conversation and return an iterator that records its result."""
         conversation, history = await self._prepare(project_id, user_id, conversation_id, user_message)
+        # A StreamingResponse begins sending after this method returns. Some ASGI
+        # servers close request-scoped dependencies at that point, which would roll
+        # back the freshly-created conversation and user message before the token
+        # generator runs. Persist them now, then retain the resolved ID for the
+        # assistant message and the SSE metadata event.
+        resolved_conversation_id = conversation.id
+        await self.db.commit()
 
         async def generate() -> AsyncIterator[str]:
             chunks: list[str] = []
@@ -116,7 +123,7 @@ class AIService:
                 usage = getattr(self.provider, "last_usage", AIUsage())
                 response = AIResponse(content="".join(chunks), model=getattr(self.provider, "model", "unknown"), usage=usage)
                 await self.conversation_repo.add_message(
-                    Message(conversation_id=conversation.id, role=MessageRole.ASSISTANT, content=response.content)
+                    Message(conversation_id=resolved_conversation_id, role=MessageRole.ASSISTANT, content=response.content)
                 )
                 self._record_request(
                     user_id,
@@ -138,7 +145,7 @@ class AIService:
                 await self.db.commit()
                 raise RuntimeError(f"AI provider error: {error}") from error
 
-        return conversation.id, generate()
+        return resolved_conversation_id, generate()
 
     async def capability(
         self,

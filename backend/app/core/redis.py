@@ -74,8 +74,8 @@ async def enforce_ai_rate_limit(redis: Redis, user_id: uuid.UUID, project_id: uu
             settings.RATE_LIMIT_AI_PER_MINUTE,
             f"{now_ms}:{uuid.uuid4().hex}",
         )
-    except RedisError:
-        logger.exception("Redis AI rate limiter unavailable; allowing request")
+    except Exception:
+        logger.warning("Redis AI rate limiter unavailable; allowing request")
         return
 
     if int(allowed) != 1:

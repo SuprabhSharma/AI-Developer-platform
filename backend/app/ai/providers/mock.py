@@ -15,10 +15,13 @@ class MockProvider(AIProvider):
 
     async def chat(self, messages: list[ChatMessage]) -> AIResponse:
         last_user = next((m.content for m in reversed(messages) if m.role == "user"), "")
-        reply = (
-            f"[mock-ai] I received your message: \"{last_user[:200]}\". "
-            "Configure AI_PROVIDER and AI_API_KEY to talk to a real model."
-        )
+        if any(m.role == "system" and "coding agent planner" in m.content for m in messages):
+            reply = '[{"tool_name":"write_file","tool_input":{"path":"agent-notes.txt","content":"Created by the mock coding agent.\\n"},"description":"Create an agent note file"}]'
+        else:
+            reply = (
+                f"[mock-ai] I received your message: \"{last_user[:200]}\". "
+                "Configure AI_PROVIDER and AI_API_KEY to talk to a real model."
+            )
         response = AIResponse(
             content=reply,
             model="mock-1",

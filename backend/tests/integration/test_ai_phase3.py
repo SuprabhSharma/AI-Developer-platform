@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from app.core.redis import get_redis
@@ -41,6 +43,32 @@ async def test_stream_chat_persists_usage_and_conversation(client):
     assert usage.json()["total_requests"] == 1
     assert usage.json()["tokens_used_this_week"] > 0
     assert usage.json()["providers"][0]["provider"] == "mock"
+
+
+@pytest.mark.asyncio
+async def test_stream_chat_accepts_a_follow_up_for_the_same_conversation(client):
+    app.dependency_overrides[get_redis] = lambda: AllowRedis()
+    headers = await _auth_headers(client, "follow-up@example.com")
+    project = await client.post("/api/v1/projects", json={"name": "Follow-up"}, headers=headers)
+    project_id = project.json()["id"]
+
+    first = await client.post(
+        f"/api/v1/projects/{project_id}/chat/stream",
+        json={"message": "first message"},
+        headers=headers,
+    )
+    assert first.status_code == 200
+    match = re.search(r'event: meta\ndata: \{"conversation_id":"([^"]+)"\}', first.text)
+    assert match
+
+    second = await client.post(
+        f"/api/v1/projects/{project_id}/chat/stream",
+        json={"message": "second message", "conversation_id": match.group(1)},
+        headers=headers,
+    )
+    assert second.status_code == 200
+    assert f'"conversation_id":"{match.group(1)}"' in second.text
+    assert "event: done" in second.text
 
 
 @pytest.mark.asyncio

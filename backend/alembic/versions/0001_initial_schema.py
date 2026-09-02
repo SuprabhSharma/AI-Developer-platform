@@ -22,7 +22,11 @@ def upgrade() -> None:
     # `alembic revision --autogenerate` produces normal incremental migrations
     # diffed against this baseline.
     bind = op.get_bind()
-    Base.metadata.create_all(bind=bind, checkfirst=True)
+    # Keep this historical baseline stable as models are added in later phases.
+    later_phase_tables = {"plans", "plan_steps", "agent_runs"}
+    for table in Base.metadata.sorted_tables:
+        if table.name not in later_phase_tables:
+            table.create(bind=bind, checkfirst=True)
 
 
 def downgrade() -> None:

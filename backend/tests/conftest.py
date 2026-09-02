@@ -10,10 +10,19 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app as fastapi_app
 import app.models  # noqa: F401
+
+
+@pytest.fixture(autouse=True)
+def isolate_ai_provider(monkeypatch):
+    """Keep tests offline even when a developer has configured a live provider."""
+    monkeypatch.setattr(settings, "AI_PROVIDER", "mock")
+    monkeypatch.setattr(settings, "AI_API_KEY", "")
+    monkeypatch.setattr(settings, "AI_MODEL", "default")
 
 
 @pytest_asyncio.fixture

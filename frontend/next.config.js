@@ -1,8 +1,10 @@
 /** @type {import('next').NextConfig} */
+const backendApiUrl = process.env.BACKEND_API_URL || "http://localhost:8000";
+
 const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
-    return [{ source: "/api/backend/:path*", destination: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/:path*` }];
+    return [{ source: "/api/backend/:path*", destination: `${backendApiUrl}/api/v1/:path*` }];
   },
 };
 module.exports = nextConfig;

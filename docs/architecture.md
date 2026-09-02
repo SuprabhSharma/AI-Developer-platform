@@ -21,5 +21,5 @@ in-process state.
 
 ## Request flow
 Frontend (Next.js) → FastAPI (`/api/v1`) → Service → Repository → PostgreSQL.
-AI chat: FastAPI → AIService → AIProvider (Mock/Gemini/Groq/Ollama) → persisted
+AI chat: FastAPI → AIService → AIProvider (Mock/Gemini/Groq/OpenRouter/Ollama) → persisted
 Message + AIRequest usage row.

@@ -2,7 +2,10 @@
  * Thin fetch wrapper for the backend API. All frontend network calls go
  * through here so auth-header injection and error handling live in one place.
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Keep browser requests same-origin. Next.js proxies this prefix to the
+// backend, avoiding CORS and localhost/127.0.0.1 address mismatches.
+const API_PREFIX = "/api/backend";
+let refreshPromise: Promise<boolean> | null = null;
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -10,7 +13,7 @@ function getToken(): string | null {
 }
 
 export function apiEndpoint(path: string): string {
-  return `${API_URL}/api/v1${path}`;
+  return `${API_PREFIX}${path}`;
 }
 
 export function apiHeaders(options: HeadersInit = {}): Headers {
@@ -21,7 +24,25 @@ export function apiHeaders(options: HeadersInit = {}): Headers {
   return headers;
 }
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function refreshAccessToken(): Promise<boolean> {
+  const refreshToken = typeof window === "undefined" ? null : localStorage.getItem("refresh_token");
+  if (!refreshToken) return false;
+  if (!refreshPromise) {
+    refreshPromise = fetch(apiEndpoint("/auth/refresh"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }).then(async (res) => {
+      if (!res.ok) return false;
+      const tokens = await res.json() as { access_token: string; refresh_token: string };
+      setTokens(tokens.access_token, tokens.refresh_token);
+      return true;
+    }).catch(() => false).finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
+
+export async function apiFetch<T>(path: string, options: RequestInit = {}, authRetry = true): Promise<T> {
   const isMultipart = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = new Headers(options.headers);
   if (!isMultipart && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
@@ -31,6 +52,16 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     ...options,
     headers,
   });
+
+  const refreshable = res.status === 401 && !["/auth/login", "/auth/register", "/auth/refresh"].includes(path);
+  if (refreshable) {
+    if (authRetry && await refreshAccessToken()) return apiFetch<T>(path, options, false);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      if (window.location.pathname !== "/login") window.location.replace("/login");
+    }
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

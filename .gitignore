@@ -11,3 +11,4 @@ storage_data/
 .pytest_cache/
 dist/
 build/
+.env.example

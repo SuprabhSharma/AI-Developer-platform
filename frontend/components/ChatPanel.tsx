@@ -64,13 +64,27 @@ export default function ChatPanel({
     setSending(true);
     setError(null);
     try {
-      const response = await fetch(apiEndpoint(`/projects/${projectId}/chat/stream`), {
-        method: "POST",
-        headers: apiHeaders(),
-        body: JSON.stringify(request),
-      });
-      if (!response.ok) {
+      let streamRequest = request;
+      let retriedMissingConversation = false;
+      let response: Response;
+      while (true) {
+        response = await fetch(apiEndpoint(`/projects/${projectId}/chat/stream`), {
+          method: "POST",
+          headers: apiHeaders(),
+          body: JSON.stringify(streamRequest),
+        });
+        if (response.ok) break;
+
         const body = await response.json().catch(() => ({}));
+        // Conversations created before the streaming transaction fix may no
+        // longer exist. Start a fresh thread once so an old browser tab does
+        // not remain permanently stuck on a stale ID.
+        if (body.error === "Conversation not found" && streamRequest.conversation_id && !retriedMissingConversation) {
+          retriedMissingConversation = true;
+          streamRequest = { ...streamRequest, conversation_id: null };
+          setConversationId(null);
+          continue;
+        }
         throw new Error(body.error || `Request failed with status ${response.status}`);
       }
       if (!response.body) throw new Error("The assistant returned an empty stream");
