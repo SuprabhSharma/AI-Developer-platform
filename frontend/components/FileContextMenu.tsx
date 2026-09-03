@@ -18,6 +18,8 @@ interface FileContextMenuProps {
   onClose: () => void;
   onNewFile?: (parentPath: string) => void;
   onNewFolder?: (parentPath: string) => void;
+  onImportFiles?: (parentPath: string) => void;
+  onImportFolder?: (parentPath: string) => void;
   onRename?: (path: string, currentName: string) => void;
   onDelete?: (path: string, name: string) => void;
   onOpen?: (path: string) => void;
@@ -32,6 +34,8 @@ export default function FileContextMenu({
   onClose,
   onNewFile,
   onNewFolder,
+  onImportFiles,
+  onImportFolder,
   onRename,
   onDelete,
   onOpen,
@@ -146,6 +150,17 @@ export default function FileContextMenu({
           >
             <Icon name="folder-plus" size={13} /> New Folder
           </button>
+          {(onImportFiles || onImportFolder) && <div className="context-menu-divider" />}
+          {onImportFiles && (
+            <button type="button" onClick={() => { onImportFiles(target.path); onClose(); }}>
+              <Icon name="upload" size={13} /> Import Files Here
+            </button>
+          )}
+          {onImportFolder && (
+            <button type="button" onClick={() => { onImportFolder(target.path); onClose(); }}>
+              <Icon name="archive" size={13} /> Import Folder Here
+            </button>
+          )}
           {canModify && (
             <>
               <div className="context-menu-divider" />

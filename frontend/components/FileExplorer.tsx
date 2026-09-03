@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Icon from "@/components/Icon";
 import { buildTree, isValidMoveTarget, type TreeNode } from "@/lib/fileTree";
 import { useFileExplorer } from "@/lib/useFileExplorer";
+import { entriesFromDataTransfer, entriesFromFileList } from "@/lib/importFiles";
 import FileContextMenu, { type ContextMenuTarget } from "./FileContextMenu";
 import FileTreeRenderer from "./FileTreeRenderer";
 import type { FileNode } from "@/types/api";
@@ -21,6 +22,8 @@ interface FileExplorerProps {
   onCreateFolder: (path: string) => Promise<void>;
   onRenameFile: (oldPath: string, newPath: string) => Promise<void>;
   onDeleteFile: (path: string) => Promise<void>;
+  /** Import files/folders from the user's device. Enables the header buttons and drag-and-drop-from-desktop import. */
+  onUploadFiles?: (entries: UploadEntry[]) => Promise<void>;
   onExplainFile?: (path: string) => void;
   onGenerateTests?: (path: string) => void;
   projectName?: string;
@@ -31,7 +34,7 @@ interface FileExplorerProps {
 
 export default function FileExplorer({
   files, onSelect, activePath, loading, error, onRetry,
-  onCreateFile, onCreateFolder, onRenameFile, onDeleteFile,
+  onCreateFile, onCreateFolder, onRenameFile, onDeleteFile, onUploadFiles,
   onExplainFile, onGenerateTests, projectName, rootName = "main",
   createRequest, onCreateRequestHandled,
 }: FileExplorerProps) {
@@ -44,7 +47,11 @@ export default function FileExplorer({
   const [draggingNode, setDraggingNode] = useState<TreeNode | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [externalDragActive, setExternalDragActive] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const importTargetRef = useRef<string>("");
 
   const tree = useMemo(() => buildTree(files), [files]);
 
@@ -125,6 +132,53 @@ export default function FileExplorer({
     } finally { setDraggingNode(null); setBusy(false); }
   };
 
+  const runImport = useCallback(async (entries: UploadEntry[], targetDir: string) => {
+    if (!onUploadFiles || entries.length === 0) return;
+    setBusy(true);
+    try {
+      await onUploadFiles(entries);
+      expandToPath(targetDir);
+      setSelectedPath(targetDir);
+    } finally {
+      setBusy(false);
+    }
+  }, [onUploadFiles, expandToPath]);
+
+  const openImportFiles = useCallback((targetDir?: string) => {
+    if (!onUploadFiles) return;
+    importTargetRef.current = targetDir ?? resolveTargetParent(selectedPath);
+    fileInputRef.current?.click();
+  }, [onUploadFiles, resolveTargetParent, selectedPath]);
+
+  const openImportFolder = useCallback((targetDir?: string) => {
+    if (!onUploadFiles) return;
+    importTargetRef.current = targetDir ?? resolveTargetParent(selectedPath);
+    folderInputRef.current?.click();
+  }, [onUploadFiles, resolveTargetParent, selectedPath]);
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = e.target.files;
+    const target = importTargetRef.current;
+    e.target.value = "";
+    if (list && list.length > 0) await runImport(entriesFromFileList(list, target), target);
+  };
+
+  const isExternalFileDrag = (e: React.DragEvent) =>
+    !draggingNode && !!onUploadFiles && Array.from(e.dataTransfer.types || []).includes("Files");
+
+  const handleExternalDragOver = (e: React.DragEvent) => {
+    if (isExternalFileDrag(e)) { e.preventDefault(); setExternalDragActive(true); }
+  };
+
+  const handleExternalDrop = async (e: React.DragEvent) => {
+    if (!isExternalFileDrag(e)) return;
+    e.preventDefault();
+    setExternalDragActive(false);
+    const target = resolveTargetParent(selectedPath);
+    const entries = await entriesFromDataTransfer(e.dataTransfer, target);
+    await runImport(entries, target);
+  };
+
   const isMainSelected = selectedPath === "" || selectedPath === "__main__";
 
   return (
@@ -134,11 +188,33 @@ export default function FileExplorer({
         <div className="explorer-header-actions">
           <button type="button" title="New File" onClick={() => startCreate("file", resolveTargetParent(selectedPath))}><Icon name="plus" size={14} /></button>
           <button type="button" title="New Folder" onClick={() => startCreate("folder", resolveTargetParent(selectedPath))}><Icon name="folder-plus" size={14} /></button>
+          {onUploadFiles && <button type="button" title="Import Files from Device" onClick={() => openImportFiles()}><Icon name="upload" size={13} /></button>}
+          {onUploadFiles && <button type="button" title="Import Folder from Device" onClick={() => openImportFolder()}><Icon name="archive" size={13} /></button>}
           {onRetry && <button type="button" title="Refresh" onClick={onRetry}><Icon name="refresh" size={13} /></button>}
           <button type="button" title="Collapse All" onClick={() => setExpanded(new Set(["__project__", "__main__"]))}><Icon name="close" size={13} /></button>
         </div>
       </div>
-      <div className="tree-content" onClick={() => setSelectedPath("")}>
+      {onUploadFiles && (
+        <>
+          <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileInputChange} />
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            hidden
+            // @ts-expect-error non-standard attributes, needed for folder selection support across browsers
+            webkitdirectory="" directory=""
+            onChange={handleFileInputChange}
+          />
+        </>
+      )}
+      <div
+        className={`tree-content ${externalDragActive ? "tree-content-import-target" : ""}`}
+        onClick={() => setSelectedPath("")}
+        onDragOver={handleExternalDragOver}
+        onDragLeave={(e) => { if (e.currentTarget === e.target) setExternalDragActive(false); }}
+        onDrop={(e) => void handleExternalDrop(e)}
+      >
         {loading && <div className="tree-loading"><span className="spinner" /> Loading files...</div>}
         {error && <div className="panel-state panel-state-error"><span>{error}</span>{onRetry && <button type="button" className="text-button" onClick={onRetry}>Retry</button>}</div>}
         {!loading && !error && (
@@ -166,7 +242,7 @@ export default function FileExplorer({
                 {expanded.has("__main__") && (
                   <div className="tree-main-contents">
                     <FileTreeRenderer
-                      nodes={tree} depth={1} files={files} expanded={expanded} creating={creating}
+                      nodes={tree} parentPath="" depth={1} files={files} expanded={expanded} creating={creating}
                       renamingPath={renamingPath} busy={busy} selectedPath={selectedPath} activePath={activePath}
                       draggingNode={draggingNode} dragOverTarget={dragOverTarget} onToggle={toggleExpand}
                       onSelect={(p, isD) => { setSelectedPath(p); if (!isD) onSelect(p); else toggleExpand(p); }}
@@ -184,11 +260,18 @@ export default function FileExplorer({
             <div className="tree-empty-backdrop" style={{ minHeight: "80px" }} onClick={() => setSelectedPath("")} />
           </div>
         )}
+        {externalDragActive && (
+          <div className="tree-import-hint">
+            Drop to import into {isMainSelected ? rootName : resolveTargetParent(selectedPath) || rootName}
+          </div>
+        )}
       </div>
       {contextMenu && (
         <FileContextMenu
           x={contextMenu.x} y={contextMenu.y} target={contextMenu.target} onClose={() => setContextMenu(null)}
           onNewFile={(parent) => startCreate("file", parent)} onNewFolder={(parent) => startCreate("folder", parent)}
+          onImportFiles={onUploadFiles ? (parent) => openImportFiles(parent) : undefined}
+          onImportFolder={onUploadFiles ? (parent) => openImportFolder(parent) : undefined}
           onRename={(path) => setRenamingPath(path)} onDelete={(path, name) => void handleDelete(path, name)}
           onOpen={(path) => onSelect(path)} onExplainFile={onExplainFile} onGenerateTests={onGenerateTests}
         />

@@ -1,13 +1,16 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { getParentPath, isValidMoveTarget, type TreeNode } from "@/lib/fileTree";
+import { isValidMoveTarget, type TreeNode } from "@/lib/fileTree";
 import InlineInput from "./InlineInput";
 import TreeNodeItem from "./TreeNodeItem";
 import type { FileNode } from "@/types/api";
 
 interface FileTreeRendererProps {
   nodes: TreeNode[];
+  /** Path of the directory that directly contains `nodes` ("" for the workspace root). Passed explicitly
+   * (never inferred from `nodes[0]`) so empty folders and single-child folders behave identically. */
+  parentPath: string;
   depth: number;
   files: FileNode[];
   expanded: Set<string>;
@@ -62,6 +65,7 @@ function FolderBranch({
 
 export default function FileTreeRenderer({
   nodes,
+  parentPath,
   depth,
   files,
   expanded,
@@ -85,11 +89,9 @@ export default function FileTreeRenderer({
   onRenameSubmit,
   onRenameCancel,
 }: FileTreeRendererProps) {
-  const currentParentPath = depth === 1 ? "" : nodes[0] ? getParentPath(nodes[0].path) : "";
-
   return (
     <>
-      {creating && creating.parentPath === currentParentPath && (
+      {creating && creating.parentPath === parentPath && (
         <InlineInput
           type={creating.type}
           depth={depth}
@@ -146,17 +148,9 @@ export default function FileTreeRenderer({
             />
             {isDir && (
               <FolderBranch node={node} depth={depth} isExp={isExp}>
-                {creating && creating.parentPath === node.path && (
-                  <InlineInput
-                    type={creating.type}
-                    depth={depth + 1}
-                    busy={busy}
-                    onSubmit={onCreateSubmit}
-                    onCancel={onCreateCancel}
-                  />
-                )}
                 <FileTreeRenderer
                   nodes={node.children}
+                  parentPath={node.path}
                   depth={depth + 1}
                   files={files}
                   expanded={expanded}

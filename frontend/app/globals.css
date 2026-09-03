@@ -208,6 +208,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .tree-folder-children.tree-folder-expanded { grid-template-rows: 1fr; opacity: 1; }
 .tree-folder-inner { min-height: 0; overflow: hidden; }
 .tree-empty-backdrop { cursor: default; flex: 1; }
+.tree-content-import-target { outline: 1px dashed var(--blue); outline-offset: -3px; background: rgba(56, 139, 253, .06); }
+.tree-import-hint { position: sticky; bottom: 0; margin: 4px 8px; padding: 5px 8px; border-radius: 4px; border: 1px dashed var(--blue); background: rgba(56, 139, 253, .12); color: var(--blue); font-size: 11px; text-align: center; pointer-events: none; }
 .tree-inline-input-row { position: relative; display: flex; align-items: center; gap: 5px; width: 100%; height: 22px; min-height: 22px; padding-right: 8px; }
 .tree-inline-input { min-width: 0; flex: 1; height: 18px; border: 1px solid var(--blue); outline: none; border-radius: 2px; color: #fff; background: var(--canvas); padding: 0 5px; font-size: 12px; font-family: inherit; box-shadow: 0 0 0 1px var(--blue-strong); }
 .context-menu { position: fixed; z-index: 50; min-width: 155px; padding: 4px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-raised); box-shadow: 0 12px 30px rgba(0, 0, 0, .5); }
