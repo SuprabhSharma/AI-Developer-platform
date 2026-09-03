@@ -1,6 +1,14 @@
 "use client";
 
-import Editor from "@monaco-editor/react";
+import Editor, { loader } from "@monaco-editor/react";
+
+// By default @monaco-editor/react pulls the editor runtime from a CDN the
+// first time it mounts. That fails silently on machines without outbound
+// internet access, which makes the editor pane look permanently blank/frozen
+// even though the file tree and file-content API calls all succeed. Serve
+// the same assets from our own origin instead (see scripts/copy-monaco-assets.js,
+// which runs on `npm install` and copies them into public/monaco-editor/vs).
+loader.config({ paths: { vs: "/monaco-editor/vs" } });
 
 function defineForgeTheme(monaco: { editor: { defineTheme: (name: string, theme: object) => void } }) {
   monaco.editor.defineTheme("forge-dark", {

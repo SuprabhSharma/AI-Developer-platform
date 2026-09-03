@@ -12,3 +12,4 @@ storage_data/
 dist/
 build/
 .env.example
+frontend/public/monaco-editor/

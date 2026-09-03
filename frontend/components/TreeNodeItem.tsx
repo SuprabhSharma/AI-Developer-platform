@@ -105,8 +105,14 @@ export const TreeNodeItem = memo(function TreeNodeItem({
         onSelect(node.path, isDirectory);
       }}
       onDoubleClick={(e) => {
+        // Folders already expand/collapse on single click (via onSelect above).
+        // A trailing double-click fires two more click events plus this one,
+        // so re-toggling here caused a visible open->close->open flicker and,
+        // depending on render timing, could leave the row looking stuck/inert.
+        // Files have no special double-click behavior here (single click opens
+        // them), matching a "preview" style editor rather than VS Code's
+        // pinned-tab-on-double-click, which isn't implemented in this build.
         e.stopPropagation();
-        if (isDirectory) onToggle(node.path);
       }}
       onContextMenu={(e) => onContextMenu(e, node)}
       role="treeitem"
