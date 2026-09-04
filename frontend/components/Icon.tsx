@@ -25,6 +25,7 @@ export type IconName =
   | "search"
   | "send"
   | "sparkle"
+  | "terminal"
   | "trash"
   | "upload"
   | "x";
@@ -53,6 +54,7 @@ const paths: Record<IconName, JSX.Element> = {
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
   send: <><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>,
   sparkle: <><path d="m12 3-1.5 5.5L5 10l5.5 1.5L12 17l1.5-5.5L19 10l-5.5-1.5Z" /><path d="m19 17-.7 2.3L16 20l2.3.7L19 23l.7-2.3L22 20l-2.3-.7Z" /></>,
+  terminal: <><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></>,
   trash: <><path d="M4 7h16M10 11v6M14 11v6" /><path d="M6 7l1 14h10l1-14M9 7V4h6v3" /></>,
   upload: <><path d="M12 16V4" /><path d="m6 10 6-6 6 6" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></>,
   dollar: <><path d="M12 2v20M17 6.5C16.2 5.5 14.7 5 12.8 5 10.1 5 8 6.5 8 8.5c0 2.2 2.1 3 4.7 3.6 2.5.6 4.3 1.5 4.3 3.7 0 2.1-2.2 3.7-5 3.7-2.2 0-4-.7-5-2" /></>,

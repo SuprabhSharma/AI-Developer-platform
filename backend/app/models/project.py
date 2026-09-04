@@ -22,6 +22,10 @@ class Project(Base, UUIDPKMixin, TimestampMixin):
     workspaces: Mapped[list["Workspace"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     conversations: Mapped[list["Conversation"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
+    @property
+    def workspace_id(self) -> uuid.UUID | None:
+        return self.workspaces[0].id if self.workspaces else None
+
 
 class WorkspaceStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"

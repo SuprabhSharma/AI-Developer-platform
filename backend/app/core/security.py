@@ -48,3 +48,11 @@ def decode_token(token: str) -> dict[str, Any] | None:
         return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
     except JWTError:
         return None
+
+
+def decode_access_token(token: str) -> dict[str, Any] | None:
+    claims = decode_token(token)
+    if claims and claims.get("type") == "access":
+        return claims
+    return None
+

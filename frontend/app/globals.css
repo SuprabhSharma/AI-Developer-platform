@@ -219,7 +219,12 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .context-menu .context-danger:hover { background: rgba(248, 81, 73, .15); color: #ff8182; }
 .context-menu-divider { height: 1px; margin: 3px 2px; background: var(--line); }
 
-.editor-shell { position: relative; height: 100%; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.editor-shell { position: relative; height: 100%; display: flex; flex-direction: column; }
+.editor-tab-bar { background: var(--surface); border-bottom: 1px solid var(--line); }
+.editor-tab { transition: background 0.12s ease, color 0.12s ease; }
 .editor-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 8px; color: var(--muted); text-align: center; font-size: 12px; }
 .editor-empty strong { color: var(--ink); font-size: 14px; font-weight: 600; }
 .editor-empty-mark { margin-bottom: 8px; color: var(--blue); font-family: var(--font-mono); font-size: 30px; font-weight: 600; letter-spacing: -.1em; }
@@ -302,3 +307,83 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
   .usage-cards { grid-template-columns: 1fr; }
   .usage-link { display: none; }
 }
+
+/* ==========================================
+   Jupyter Notebook (.ipynb) Renderer Styles
+   ========================================== */
+
+.notebook-viewer {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.notebook-cells-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.notebook-cells-container::-webkit-scrollbar-track {
+  background: var(--canvas);
+}
+.notebook-cells-container::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
+.notebook-cells-container::-webkit-scrollbar-thumb:hover {
+  background: #58a6ff88;
+}
+
+/* Pandas DataFrame & HTML Table Output Styling */
+.nb-dataframe-container table,
+.nb-dataframe-container table.dataframe {
+  width: auto;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink);
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  margin: 4px 0;
+}
+
+.nb-dataframe-container table th,
+.nb-dataframe-container table td,
+.nb-dataframe-container table.dataframe th,
+.nb-dataframe-container table.dataframe td {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.nb-dataframe-container table thead th,
+.nb-dataframe-container table.dataframe thead th {
+  background: var(--surface-hover);
+  color: #f0f6fc;
+  font-weight: 600;
+  text-align: right;
+  border-bottom: 2px solid var(--line-strong);
+}
+
+.nb-dataframe-container table tbody tr:nth-child(even),
+.nb-dataframe-container table.dataframe tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.nb-dataframe-container table tbody tr:hover,
+.nb-dataframe-container table.dataframe tbody tr:hover {
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.nb-dataframe-container table tbody th,
+.nb-dataframe-container table.dataframe tbody th {
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 500;
+  text-align: left;
+}
+
+/* ── Terminal Panel ────────────────────────────────── */
+.xterm { height: 100%; }
+.xterm-viewport { background-color: #0d1117 !important; }
+.xterm .xterm-screen { padding: 4px 8px; }
+

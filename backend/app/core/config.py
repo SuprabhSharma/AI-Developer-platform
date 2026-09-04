@@ -74,6 +74,17 @@ class Settings(BaseSettings):
     MAX_FILE_UPLOAD_BYTES: int = 10_000_000  # 10MB cap per uploaded file
     MAX_BATCH_UPLOAD_FILES: int = 1_000
 
+    # --- Execution Sandbox ---
+    SANDBOX_IMAGE: str = "python:3.11-slim"
+    SANDBOX_CPU_PERIOD: int = 100_000
+    SANDBOX_CPU_QUOTA: int = 50_000          # 50% of 1 CPU
+    SANDBOX_MEM_LIMIT: str = "256m"
+    SANDBOX_TIMEOUT_IDLE_SECONDS: int = 300  # Kill container after 5min idle
+    SANDBOX_NETWORK_MODE: str = "none"       # No internet in sandbox (security)
+    WORKSPACE_ROOT_HOST: str = "./storage_data"
+    WORKSPACE_ROOT_CONTAINER: str = "/workspaces"
+    KERNEL_IDLE_TIMEOUT_SECONDS: int = 600
+
 
 @lru_cache
 def get_settings() -> Settings:

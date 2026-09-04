@@ -30,6 +30,9 @@ async def get_current_user(
     return user
 
 
+get_current_user_dep = get_current_user
+
+
 async def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role != "ADMIN":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin privileges required")

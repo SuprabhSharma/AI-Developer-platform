@@ -23,6 +23,16 @@ class ProjectRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_id_and_owner(self, project_id: uuid.UUID | str, user_id: uuid.UUID | str) -> Project | None:
+        pid = uuid.UUID(str(project_id))
+        uid = uuid.UUID(str(user_id))
+        result = await self.db.execute(
+            select(Project)
+            .where(Project.id == pid, Project.owner_id == uid)
+            .options(selectinload(Project.workspaces))
+        )
+        return result.scalar_one_or_none()
+
     async def list_for_organization(
         self, organization_id: uuid.UUID, page: int, page_size: int
     ) -> tuple[list[Project], int]:

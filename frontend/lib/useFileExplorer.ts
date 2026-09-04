@@ -21,7 +21,7 @@ export function useFileExplorer({
 }: UseExplorerArgs) {
   const visiblePaths = useMemo(() => {
     const list: { path: string; isDir: boolean }[] = [];
-    if (!expanded.has("__project__") || !expanded.has("__main__")) return list;
+    if (!expanded.has("__project__")) return list;
     function walk(nodes: TreeNode[]) {
       for (const n of nodes) {
         list.push({ path: n.path, isDir: n.file_type === "DIRECTORY" });
@@ -33,7 +33,7 @@ export function useFileExplorer({
   }, [expanded, tree]);
 
   const resolveTargetParent = (path: string | null): string => {
-    if (!path || path === "__project__" || path === "__main__") return "";
+    if (!path || path === "__project__") return "";
     const node = files.find((f) => f.path === path);
     return node?.file_type === "DIRECTORY" ? path : getParentPath(path);
   };

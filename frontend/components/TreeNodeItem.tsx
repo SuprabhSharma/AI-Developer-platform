@@ -46,6 +46,8 @@ function getFileIconColorClass(name: string): string {
     case "sh":
     case "bash":
       return "text-lime-400";
+    case "ipynb":
+      return "text-orange-400";
     case "png":
     case "jpg":
     case "svg":

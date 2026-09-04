@@ -1,8 +1,12 @@
-"""FastAPI application entrypoint."""
+import asyncio
 import logging
+import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -13,6 +17,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
 from app.core.redis import create_redis_client
+from app.services import kernel_service, sandbox_service
 from app.utils.request_id import RequestIdMiddleware
 
 configure_logging(settings.DEBUG)
@@ -21,7 +26,25 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     application.state.redis = create_redis_client()
+
+    async def cleanup_loop():
+        while True:
+            try:
+                await asyncio.sleep(60)
+                await sandbox_service.cleanup_idle_sandboxes()
+                await kernel_service.cleanup_idle_kernels()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.warning("Error in background cleanup loop: %s", e)
+
+    task = asyncio.create_task(cleanup_loop())
     yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
     await application.state.redis.aclose()
 
 

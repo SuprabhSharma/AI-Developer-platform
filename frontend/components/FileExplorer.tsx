@@ -23,7 +23,7 @@ interface FileExplorerProps {
   onRenameFile: (oldPath: string, newPath: string) => Promise<void>;
   onDeleteFile: (path: string) => Promise<void>;
   /** Import files/folders from the user's device. Enables the header buttons and drag-and-drop-from-desktop import. */
-  onUploadFiles?: (entries: UploadEntry[]) => Promise<void>;
+  onUploadFiles?: (entries: UploadEntry[], directories?: string[]) => Promise<void>;
   onExplainFile?: (path: string) => void;
   onGenerateTests?: (path: string) => void;
   projectName?: string;
@@ -39,7 +39,7 @@ export default function FileExplorer({
   createRequest, onCreateRequestHandled,
 }: FileExplorerProps) {
   const displayProjectName = projectName || "AI Developer Platform";
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["__project__", "__main__"]));
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["__project__"]));
   const [selectedPath, setSelectedPath] = useState<string | null>("");
   const [creating, setCreating] = useState<{ type: "file" | "folder"; parentPath: string } | null>(null);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
@@ -61,7 +61,7 @@ export default function FileExplorer({
 
   const expandToPath = useCallback((dir: string) => {
     setExpanded((p) => {
-      const n = new Set(p); n.add("__project__"); n.add("__main__");
+      const n = new Set(p); n.add("__project__");
       if (dir) dir.split("/").forEach((_, i, arr) => n.add(arr.slice(0, i + 1).join("/")));
       return n;
     });
@@ -132,13 +132,17 @@ export default function FileExplorer({
     } finally { setDraggingNode(null); setBusy(false); }
   };
 
-  const runImport = useCallback(async (entries: UploadEntry[], targetDir: string) => {
-    if (!onUploadFiles || entries.length === 0) return;
+  const runImport = useCallback(async (entries: UploadEntry[], targetDir: string, directories: string[] = []) => {
+    if (!onUploadFiles || (entries.length === 0 && directories.length === 0)) return;
     setBusy(true);
     try {
-      await onUploadFiles(entries);
+      await onUploadFiles(entries, directories);
       expandToPath(targetDir);
       setSelectedPath(targetDir);
+    } catch {
+      // Error is already surfaced to the user via toast by onUploadFiles.
+      // Swallow here so a failed import doesn't also throw an unhandled
+      // rejection into the console on top of the visible toast.
     } finally {
       setBusy(false);
     }
@@ -159,9 +163,15 @@ export default function FileExplorer({
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     const target = importTargetRef.current;
-    e.target.value = "";
-    if (list && list.length > 0) await runImport(entriesFromFileList(list, target), target);
+    if (list && list.length > 0) {
+      const entries = entriesFromFileList(list, target);
+      e.target.value = "";
+      await runImport(entries, target);
+    } else {
+      e.target.value = "";
+    }
   };
+
 
   const isExternalFileDrag = (e: React.DragEvent) =>
     !draggingNode && !!onUploadFiles && Array.from(e.dataTransfer.types || []).includes("Files");
@@ -175,11 +185,9 @@ export default function FileExplorer({
     e.preventDefault();
     setExternalDragActive(false);
     const target = resolveTargetParent(selectedPath);
-    const entries = await entriesFromDataTransfer(e.dataTransfer, target);
-    await runImport(entries, target);
+    const { entries, directories } = await entriesFromDataTransfer(e.dataTransfer, target);
+    await runImport(entries, target, directories);
   };
-
-  const isMainSelected = selectedPath === "" || selectedPath === "__main__";
 
   return (
     <div className="file-explorer" tabIndex={0} ref={containerRef} onKeyDown={handleKeyDown} onClick={() => setSelectedPath("")}>
@@ -191,7 +199,7 @@ export default function FileExplorer({
           {onUploadFiles && <button type="button" title="Import Files from Device" onClick={() => openImportFiles()}><Icon name="upload" size={13} /></button>}
           {onUploadFiles && <button type="button" title="Import Folder from Device" onClick={() => openImportFolder()}><Icon name="archive" size={13} /></button>}
           {onRetry && <button type="button" title="Refresh" onClick={onRetry}><Icon name="refresh" size={13} /></button>}
-          <button type="button" title="Collapse All" onClick={() => setExpanded(new Set(["__project__", "__main__"]))}><Icon name="close" size={13} /></button>
+          <button type="button" title="Collapse All" onClick={() => setExpanded(new Set(["__project__"]))}><Icon name="close" size={13} /></button>
         </div>
       </div>
       {onUploadFiles && (
@@ -219,42 +227,50 @@ export default function FileExplorer({
         {error && <div className="panel-state panel-state-error"><span>{error}</span>{onRetry && <button type="button" className="text-button" onClick={onRetry}>Retry</button>}</div>}
         {!loading && !error && (
           <div className="tree-root-container">
-            <div className="tree-row tree-row-project" onClick={(e) => { e.stopPropagation(); toggleExpand("__project__"); setSelectedPath(""); }}>
-              <span className={`tree-chevron ${expanded.has("__project__") ? "tree-chevron-expanded" : ""}`}><Icon name="chevron-right" size={13} /></span>
-              <span className="tree-file-icon text-blue-400"><Icon name="code" size={14} /></span>
+            <div
+              className={`tree-row tree-row-project ${selectedPath === "" || selectedPath === "__project__" ? "tree-row-selected" : ""} ${dragOverTarget === "" ? "tree-row-drop-target" : ""}`}
+              onClick={(e) => { e.stopPropagation(); setSelectedPath(""); }}
+              onDoubleClick={(e) => { e.stopPropagation(); toggleExpand("__project__"); }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setSelectedPath("");
+                setContextMenu({ x: e.clientX, y: e.clientY, target: { path: "", name: displayProjectName, file_type: "DIRECTORY", isRoot: true } });
+              }}
+              onDragOver={(e) => {
+                if (draggingNode && isValidMoveTarget(draggingNode.path, draggingNode.file_type === "DIRECTORY", "", files)) {
+                  e.preventDefault();
+                  setDragOverTarget("");
+                }
+              }}
+              onDragLeave={() => setDragOverTarget(null)}
+              onDrop={(e) => handleDrop(e, "")}
+            >
+              <span className={`tree-chevron ${expanded.has("__project__") ? "tree-chevron-expanded" : ""}`} onClick={(e) => { e.stopPropagation(); toggleExpand("__project__"); }}>
+                <Icon name="chevron-right" size={13} />
+              </span>
+              <span className="tree-file-icon text-amber-400">
+                <Icon name={expanded.has("__project__") ? "folder-open" : "folder"} size={14} />
+              </span>
               <span className="tree-node-name font-semibold uppercase text-[11px] tracking-wide">{displayProjectName}</span>
+              <span className="branch-indicator ml-auto pr-2 text-[11px] opacity-75 font-normal">
+                <Icon name="branch" size={12} /> {rootName}
+              </span>
             </div>
             {expanded.has("__project__") && (
               <div className="tree-project-contents">
-                <div
-                  className={`tree-row tree-row-main ${isMainSelected ? "tree-row-selected" : ""} ${dragOverTarget === "" ? "tree-row-drop-target" : ""}`}
-                  style={{ paddingLeft: "14px" }}
-                  onClick={(e) => { e.stopPropagation(); setSelectedPath(""); }}
-                  onDoubleClick={(e) => { e.stopPropagation(); toggleExpand("__main__"); }}
-                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedPath(""); setContextMenu({ x: e.clientX, y: e.clientY, target: { path: "", name: rootName, file_type: "DIRECTORY", isMain: true } }); }}
-                  onDragOver={(e) => { if (draggingNode && isValidMoveTarget(draggingNode.path, draggingNode.file_type === "DIRECTORY", "", files)) { e.preventDefault(); setDragOverTarget(""); } }}
-                  onDragLeave={() => setDragOverTarget(null)} onDrop={(e) => handleDrop(e, "")}
-                >
-                  <span className={`tree-chevron ${expanded.has("__main__") ? "tree-chevron-expanded" : ""}`} onClick={(e) => { e.stopPropagation(); toggleExpand("__main__"); }}><Icon name="chevron-right" size={13} /></span>
-                  <span className="tree-file-icon text-amber-400"><Icon name={expanded.has("__main__") ? "folder-open" : "branch"} size={14} /></span>
-                  <span className="tree-node-name font-medium">{rootName}</span>
-                </div>
-                {expanded.has("__main__") && (
-                  <div className="tree-main-contents">
-                    <FileTreeRenderer
-                      nodes={tree} parentPath="" depth={1} files={files} expanded={expanded} creating={creating}
-                      renamingPath={renamingPath} busy={busy} selectedPath={selectedPath} activePath={activePath}
-                      draggingNode={draggingNode} dragOverTarget={dragOverTarget} onToggle={toggleExpand}
-                      onSelect={(p, isD) => { setSelectedPath(p); if (!isD) onSelect(p); else toggleExpand(p); }}
-                      onContextMenu={(e, n) => { e.preventDefault(); e.stopPropagation(); setSelectedPath(n.path); setContextMenu({ x: e.clientX, y: e.clientY, target: { path: n.path, name: n.name, file_type: n.file_type } }); }}
-                      onDragStart={(e, n) => { e.stopPropagation(); e.dataTransfer.setData("text/plain", n.path); setDraggingNode(n); }}
-                      onDragEnd={() => { setDraggingNode(null); setDragOverTarget(null); }}
-                      onDragOver={(p) => setDragOverTarget(p)} onDragLeave={() => setDragOverTarget(null)} onDrop={handleDrop}
-                      onCreateSubmit={handleCreateSubmit} onCreateCancel={() => setCreating(null)}
-                      onRenameSubmit={handleRenameSubmit} onRenameCancel={() => setRenamingPath(null)}
-                    />
-                  </div>
-                )}
+                <FileTreeRenderer
+                  nodes={tree} parentPath="" depth={1} files={files} expanded={expanded} creating={creating}
+                  renamingPath={renamingPath} busy={busy} selectedPath={selectedPath} activePath={activePath}
+                  draggingNode={draggingNode} dragOverTarget={dragOverTarget} onToggle={toggleExpand}
+                  onSelect={(p, isD) => { setSelectedPath(p); if (!isD) onSelect(p); else toggleExpand(p); }}
+                  onContextMenu={(e, n) => { e.preventDefault(); e.stopPropagation(); setSelectedPath(n.path); setContextMenu({ x: e.clientX, y: e.clientY, target: { path: n.path, name: n.name, file_type: n.file_type } }); }}
+                  onDragStart={(e, n) => { e.stopPropagation(); e.dataTransfer.setData("text/plain", n.path); setDraggingNode(n); }}
+                  onDragEnd={() => { setDraggingNode(null); setDragOverTarget(null); }}
+                  onDragOver={(p) => setDragOverTarget(p)} onDragLeave={() => setDragOverTarget(null)} onDrop={handleDrop}
+                  onCreateSubmit={handleCreateSubmit} onCreateCancel={() => setCreating(null)}
+                  onRenameSubmit={handleRenameSubmit} onRenameCancel={() => setRenamingPath(null)}
+                />
               </div>
             )}
             <div className="tree-empty-backdrop" style={{ minHeight: "80px" }} onClick={() => setSelectedPath("")} />
@@ -262,7 +278,7 @@ export default function FileExplorer({
         )}
         {externalDragActive && (
           <div className="tree-import-hint">
-            Drop to import into {isMainSelected ? rootName : resolveTargetParent(selectedPath) || rootName}
+            Drop to import into {resolveTargetParent(selectedPath) || displayProjectName}
           </div>
         )}
       </div>

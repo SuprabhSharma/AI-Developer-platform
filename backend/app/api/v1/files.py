@@ -71,8 +71,8 @@ async def upload_files(
     org: Organization = Depends(get_current_organization),
     db: AsyncSession = Depends(get_db),
 ):
-    if not files:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "At least one file is required")
+    if not files and not directories:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "At least one file or directory is required")
     if paths and len(paths) != len(files):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Each uploaded file must have one relative path")
     uploads = [(paths[index] if paths else (upload.filename or ""), await upload.read()) for index, upload in enumerate(files)]

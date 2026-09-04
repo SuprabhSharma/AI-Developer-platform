@@ -21,17 +21,25 @@ export function entriesFromFileList(fileList: FileList, targetDir: string): Uplo
   return entries;
 }
 
+export interface DroppedImport {
+  entries: UploadEntry[];
+  /** Folders that contain no files anywhere in their subtree, so they need to be created explicitly. */
+  directories: string[];
+}
+
 /**
  * Recursively read every file out of a dropped OS file/folder DataTransfer, preserving folder structure,
  * so dragging a folder from the desktop onto the explorer imports it exactly like VS Code does.
+ * Empty folders are tracked separately (a plain file list has no concept of an empty folder) so they
+ * still show up in the tree instead of silently vanishing, matching VS Code's import behavior.
  * Falls back to a flat file list on browsers without the (non-standard but broadly supported) entries API.
  */
-export async function entriesFromDataTransfer(dataTransfer: DataTransfer, targetDir: string): Promise<UploadEntry[]> {
+export async function entriesFromDataTransfer(dataTransfer: DataTransfer, targetDir: string): Promise<DroppedImport> {
   const items = dataTransfer.items;
   const supportsEntries = !!items && items.length > 0 && typeof items[0]?.webkitGetAsEntry === "function";
 
   if (!supportsEntries) {
-    return entriesFromFileList(dataTransfer.files, targetDir);
+    return { entries: entriesFromFileList(dataTransfer.files, targetDir), directories: [] };
   }
 
   type FSEntry = {
@@ -61,6 +69,7 @@ export async function entriesFromDataTransfer(dataTransfer: DataTransfer, target
   };
 
   const collected: UploadEntry[] = [];
+  const emptyDirectories: string[] = [];
 
   const walk = async (entry: FSEntry, relativePath: string): Promise<void> => {
     if (entry.isFile) {
@@ -68,6 +77,10 @@ export async function entriesFromDataTransfer(dataTransfer: DataTransfer, target
       collected.push({ file, path: joinPath(targetDir, relativePath) });
     } else if (entry.isDirectory) {
       const children = await readAllDirectoryEntries(entry);
+      if (children.length === 0) {
+        emptyDirectories.push(joinPath(targetDir, relativePath));
+        return;
+      }
       await Promise.all(children.map((child) => walk(child, `${relativePath}/${child.name}`)));
     }
   };
@@ -79,5 +92,5 @@ export async function entriesFromDataTransfer(dataTransfer: DataTransfer, target
   }
 
   await Promise.all(roots.map((entry) => walk(entry, entry.name)));
-  return collected;
+  return { entries: collected, directories: emptyDirectories };
 }
