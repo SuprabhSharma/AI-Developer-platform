@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback } from "react";
 import Icon from "@/components/Icon";
+import { getValidAccessToken } from "@/lib/api";
 
 // ==========================================
 // Types for Jupyter Notebook (.ipynb v4)
@@ -611,7 +612,7 @@ export default function NotebookViewer({ content, path, projectId, onSwitchToRaw
   const runCell = async (cellIndex: number, code: string) => {
     setRunningCell(cellIndex);
     setLiveOutputs((prev) => new Map(prev).set(cellIndex, []));
-    const token = localStorage.getItem("access_token") ?? "";
+    const token = (await getValidAccessToken()) ?? localStorage.getItem("access_token") ?? "";
 
     try {
       // Ensure kernel is started

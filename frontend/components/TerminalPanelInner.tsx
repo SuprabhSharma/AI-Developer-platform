@@ -5,6 +5,7 @@ import { FitAddon } from "xterm-addon-fit";
 import { WebLinksAddon } from "xterm-addon-web-links";
 import "xterm/css/xterm.css";
 import Icon from "@/components/Icon";
+import { getValidAccessToken, refreshAccessToken, getToken } from "@/lib/api";
 
 // WebSocket connects directly to port 8000 (can't proxy WS through Next.js rewrites)
 const WS_BASE = typeof window !== "undefined"
@@ -93,10 +94,24 @@ export default function TerminalPanelInner({ projectId }: { projectId: string })
     }
   }, []);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (!mountedRef.current) return;
-    const token = localStorage.getItem("access_token");
-    if (!token) { setStatus("error"); return; }
+
+    // Get a valid, non-expired access token (auto-refreshes if needed)
+    let token = await getValidAccessToken();
+    if (!token) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        token = getToken();
+      }
+    }
+
+    if (!token) {
+      if (!mountedRef.current) return;
+      setStatus("error");
+      termRef.current?.writeln(`\r\n\x1b[31m✗ Session expired or unauthorized. Please log in again.\x1b[0m\r\n`);
+      return;
+    }
 
     setStatus("connecting");
     const ws = new WebSocket(`${WS_BASE}/api/v1/ws/terminal/${projectId}?token=${encodeURIComponent(token)}`);
@@ -141,10 +156,21 @@ export default function TerminalPanelInner({ projectId }: { projectId: string })
       }
     };
 
-    ws.onclose = (e) => {
+    ws.onclose = async (e) => {
       if (!mountedRef.current) return;
       setStatus("disconnected");
       termRef.current?.writeln(`\r\n\x1b[33m[Disconnected: ${e.reason || "connection closed"}]\x1b[0m\r\n`);
+
+      // If closed due to auth failure (4001/4003 or handshake failure code 1006)
+      if (e.code === 4001 || e.code === 4003 || (e.code === 1006 && retryRef.current === 0)) {
+        const refreshed = await refreshAccessToken();
+        if (!refreshed && (e.code === 4001 || e.code === 4003)) {
+          setStatus("error");
+          termRef.current?.writeln(`\r\n\x1b[31m✗ Authentication expired. Please log in again.\x1b[0m\r\n`);
+          return;
+        }
+      }
+
       const delay = RECONNECT_DELAYS[Math.min(retryRef.current++, RECONNECT_DELAYS.length - 1)];
       timerRef.current = window.setTimeout(connect, delay);
     };

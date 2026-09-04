@@ -15,12 +15,38 @@ router = APIRouter(prefix="/projects/{project_id}", tags=["execution"])
 logger = logging.getLogger(__name__)
 
 
+import uuid
+from sqlalchemy import select
+from app.models.project import Workspace
+from app.models.user import Membership
+
 async def _workspace(project_id: str, user: User, db: AsyncSession) -> str:
+    try:
+        pid = uuid.UUID(str(project_id))
+    except (ValueError, TypeError):
+        raise HTTPException(404, "Invalid project ID")
+
     repo = ProjectRepository(db)
-    p = await repo.get_by_id_and_owner(project_id, user.id)
-    if not p or not p.workspace_id:
+    project = await repo.get_by_id(pid)
+    if not project:
         raise HTTPException(404, "Project not found")
-    return str(p.workspace_id)
+
+    if project.owner_id != user.id:
+        result = await db.execute(
+            select(Membership).where(
+                Membership.user_id == user.id,
+                Membership.organization_id == project.organization_id,
+            )
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(403, "Access forbidden to this project")
+
+    if not project.workspaces:
+        workspace = await repo.create_workspace(Workspace(project_id=project.id, name="main"))
+        await db.commit()
+        return str(workspace.id)
+
+    return str(project.workspaces[0].id)
 
 
 class ExecuteRequest(BaseModel):

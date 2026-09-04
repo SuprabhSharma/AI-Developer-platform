@@ -7,9 +7,14 @@
 const API_PREFIX = "/api/backend";
 let refreshPromise: Promise<boolean> | null = null;
 
-function getToken(): string | null {
+export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("access_token");
+}
+
+export function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("refresh_token");
 }
 
 export function apiEndpoint(path: string): string {
@@ -24,8 +29,8 @@ export function apiHeaders(options: HeadersInit = {}): Headers {
   return headers;
 }
 
-async function refreshAccessToken(): Promise<boolean> {
-  const refreshToken = typeof window === "undefined" ? null : localStorage.getItem("refresh_token");
+export async function refreshAccessToken(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
   if (!refreshPromise) {
     refreshPromise = fetch(apiEndpoint("/auth/refresh"), {
@@ -40,6 +45,33 @@ async function refreshAccessToken(): Promise<boolean> {
     }).catch(() => false).finally(() => { refreshPromise = null; });
   }
   return refreshPromise;
+}
+
+export async function getValidAccessToken(): Promise<string | null> {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const parts = token.split(".");
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (typeof payload.exp === "number") {
+        const expMs = payload.exp * 1000;
+        // If valid for at least 30 more seconds, return current token
+        if (Date.now() < expMs - 30_000) {
+          return token;
+        }
+      }
+    }
+  } catch {
+    // If decoding fails, attempt refresh
+  }
+
+  const refreshed = await refreshAccessToken();
+  if (refreshed) {
+    return getToken();
+  }
+  return null;
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}, authRetry = true): Promise<T> {

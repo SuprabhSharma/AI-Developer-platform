@@ -2,7 +2,9 @@
 import asyncio
 import json
 import logging
+import uuid
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from sqlalchemy import select
 from app.core.security import decode_access_token
 from app.services.sandbox_service import (
     get_or_create_sandbox,
@@ -12,7 +14,10 @@ from app.services.sandbox_service import (
 )
 from app.services.pty_service import LocalPTYSession
 from app.db.session import AsyncSessionLocal
+from app.models.project import Project, Workspace
+from app.models.user import Membership
 from app.repositories.project_repository import ProjectRepository
+from app.repositories.user_repository import UserRepository
 
 router = APIRouter(tags=["terminal"])
 logger = logging.getLogger(__name__)
@@ -20,11 +25,39 @@ logger = logging.getLogger(__name__)
 
 async def _get_workspace_id(project_id: str, user_id: str) -> str:
     async with AsyncSessionLocal() as db:
-        repo = ProjectRepository(db)
-        project = await repo.get_by_id_and_owner(project_id, user_id)
-        if not project or not project.workspace_id:
-            raise PermissionError("Not found or forbidden")
-        return str(project.workspace_id)
+        user_repo = UserRepository(db)
+        try:
+            uid = uuid.UUID(str(user_id))
+            pid = uuid.UUID(str(project_id))
+        except (ValueError, TypeError) as e:
+            raise PermissionError(f"Invalid identifier: {e}")
+
+        user = await user_repo.get_by_id(uid)
+        if not user or not user.is_active:
+            raise PermissionError("User not found or inactive")
+
+        project_repo = ProjectRepository(db)
+        project = await project_repo.get_by_id(pid)
+        if not project:
+            raise PermissionError("Project not found")
+
+        # Check ownership or organization membership
+        if project.owner_id != uid:
+            result = await db.execute(
+                select(Membership).where(
+                    Membership.user_id == uid,
+                    Membership.organization_id == project.organization_id,
+                )
+            )
+            if not result.scalar_one_or_none():
+                raise PermissionError("Access forbidden to this project")
+
+        if not project.workspaces:
+            workspace = await project_repo.create_workspace(Workspace(project_id=project.id, name="main"))
+            await db.commit()
+            return str(workspace.id)
+
+        return str(project.workspaces[0].id)
 
 
 @router.websocket("/ws/terminal/{project_id}")
@@ -33,24 +66,42 @@ async def terminal_ws(
     project_id: str,
     token: str = Query(...),
 ):
+    await websocket.accept()
+
     # 1. Auth
     payload = decode_access_token(token)
     if not payload:
-        await websocket.close(code=4001, reason="Unauthorized")
+        logger.warning("Terminal WebSocket auth failed: invalid or expired token for project %s", project_id)
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": "Authentication failed or token expired. Please refresh your session.",
+            }))
+            await websocket.close(code=4001, reason="Unauthorized")
+        except Exception:
+            pass
         return
+
     user_id = payload.get("sub")
     if not user_id:
-        await websocket.close(code=4001, reason="Unauthorized")
+        try:
+            await websocket.send_text(json.dumps({"type": "error", "message": "Invalid token subject"}))
+            await websocket.close(code=4001, reason="Unauthorized")
+        except Exception:
+            pass
         return
 
-    # 2. Verify project ownership
+    # 2. Verify project ownership & workspace
     try:
         workspace_id = await _get_workspace_id(project_id, user_id)
-    except PermissionError:
-        await websocket.close(code=4003, reason="Forbidden")
+    except PermissionError as e:
+        logger.warning("Terminal WebSocket forbidden: %s (project=%s, user=%s)", e, project_id, user_id)
+        try:
+            await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
+            await websocket.close(code=4003, reason="Forbidden")
+        except Exception:
+            pass
         return
-
-    await websocket.accept()
 
     # 3. Start or reuse sandbox (Docker or Native Local)
     try:
@@ -186,8 +237,8 @@ async def terminal_ws(
                         elif not session.is_running:
                             break
                         else:
-                            # Empty read (timeout) — shell is idle, keep polling
-                            await asyncio.sleep(0.05)
+                            # Empty read (timeout) — shell is idle, brief yield
+                            await asyncio.sleep(0.01)
                     except (WebSocketDisconnect, RuntimeError):
                         break
                     except Exception:
@@ -231,7 +282,9 @@ async def terminal_ws(
             await asyncio.gather(pty_to_ws(), ws_to_pty())
         finally:
             _stop.set()
-            try:
-                await session.close()
-            except Exception:
-                pass
+            if not session.is_running:
+                try:
+                    await session.close()
+                except Exception:
+                    pass
+
