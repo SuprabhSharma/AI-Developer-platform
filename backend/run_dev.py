@@ -16,14 +16,35 @@ code), so workspace file writes never trigger a restart.
 Usage (from the backend/ folder):
     python run_dev.py
 """
+from pathlib import Path
+import platform
+
 import uvicorn
 
+
+BACKEND_DIR = Path(__file__).resolve().parent
+APP_DIR = BACKEND_DIR / "app"
+RUNTIME_EXCLUDES = [
+    "storage_data/*",
+    "dev.db",
+]
+IS_WINDOWS = platform.system() == "Windows"
+
 if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
-        reload_dirs=["app"],
-        loop="none",
-    )
+    server_options = {
+        "host": "127.0.0.1",
+        "port": 8000,
+        "loop": "asyncio",
+    }
+    if not IS_WINDOWS:
+        server_options.update(
+            reload=True,
+            reload_dirs=[str(APP_DIR)],
+            reload_excludes=RUNTIME_EXCLUDES,
+        )
+
+    # Uvicorn's multiprocessing reloader can leave a Windows IOCP socket
+    # behind while a workspace file is being written. Source changes can be
+    # picked up by restarting this process; workspace changes must never
+    # restart the API server.
+    uvicorn.run("app.main:app", **server_options)

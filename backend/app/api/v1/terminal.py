@@ -213,6 +213,18 @@ async def terminal_ws(
             await session.start()
             register_local_session(project_id, session)
 
+        # A reconnect must not leave two reader/writer pairs attached to the
+        # same PTY. Mark the new owner before closing the old socket so its
+        # tasks also fail the ownership check while they wind down.
+        previous_websocket = session.active_websocket
+        session.active_websocket = websocket
+        if previous_websocket is not None and previous_websocket is not websocket:
+            logger.info("Replacing stale terminal WebSocket for project %s", project_id)
+            try:
+                await previous_websocket.close(code=4009, reason="Replaced by newer terminal connection")
+            except Exception:
+                pass
+
         try:
             await websocket.send_text(json.dumps({
                 "type": "connected",
@@ -222,16 +234,24 @@ async def terminal_ws(
                 "cwd": workspace_path,
             }))
         except Exception:
+            if session.active_websocket is websocket:
+                session.active_websocket = None
             return
 
         _stop = asyncio.Event()
 
         async def pty_to_ws():
             try:
-                while not _stop.is_set() and session.is_running:
+                while (
+                    not _stop.is_set()
+                    and session.is_running
+                    and session.active_websocket is websocket
+                ):
                     try:
                         data = await session.read(4096)
                         if data:
+                            if session.active_websocket is not websocket:
+                                break
                             touch_sandbox(project_id)
                             await websocket.send_bytes(data)
                         elif not session.is_running:
@@ -248,11 +268,17 @@ async def terminal_ws(
 
         async def ws_to_pty():
             try:
-                while not _stop.is_set() and session.is_running:
+                while (
+                    not _stop.is_set()
+                    and session.is_running
+                    and session.active_websocket is websocket
+                ):
                     try:
                         msg = await asyncio.wait_for(
                             websocket.receive(), timeout=1.0
                         )
+                        if session.active_websocket is not websocket:
+                            break
                         if "text" in msg:
                             parsed = json.loads(msg["text"])
                             msg_type = parsed.get("type")
@@ -282,9 +308,10 @@ async def terminal_ws(
             await asyncio.gather(pty_to_ws(), ws_to_pty())
         finally:
             _stop.set()
+            if session.active_websocket is websocket:
+                session.active_websocket = None
             if not session.is_running:
                 try:
                     await session.close()
                 except Exception:
                     pass
-

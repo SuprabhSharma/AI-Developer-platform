@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,9 @@ class LocalPTYSession:
         self.is_running = False
         self.mode = "winpty" if (IS_WINDOWS and HAS_WINPTY) else ("posix_pty" if not IS_WINDOWS else "pipe")
         self.shell_name = ""
+        # The PTY is shared by reconnects, but only one WebSocket may own its
+        # reader/writer pair at a time. Set by the terminal WebSocket route.
+        self.active_websocket: Optional[object] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
         # WinPTY state (Windows)
@@ -118,10 +122,14 @@ class LocalPTYSession:
             def _winpty_reader():
                 while self.is_running and self._winpty:
                     try:
-                        chunk = self._winpty.read(blocking=True)
+                        # Nonblocking polling keeps the asyncio event loop
+                        # responsive while the native WinPTY reader is idle.
+                        chunk = self._winpty.read(blocking=False)
                         if chunk:
                             data_bytes = chunk.encode("utf-8", errors="replace")
                             loop.call_soon_threadsafe(self._out_queue.put_nowait, data_bytes)
+                        else:
+                            time.sleep(0.01)
                     except Exception:
                         break
                 self.is_running = False
